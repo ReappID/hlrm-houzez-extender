@@ -3,7 +3,7 @@ require_once ABSPATH . 'vendor/autoload.php';
 
 class Payment
 {
-    protected $code, $xendit, $midtrans, $method, $key, $result, $payment_gateway;
+    protected $code, $xendit, $midtrans, $method, $key, $result, $payment_gateway, $xendit_method;
     public function __construct($cd = false, $method = false, $usingMidtransSnap = false, $usingXenditSnap = false)
     {
         
@@ -14,6 +14,17 @@ class Payment
             'payment_vendor' => '',
             'payment_bank_vendor' => '',
             'message' => ''
+        );
+        $this->xendit_method = [
+            'payment_2' => ["BNI", "BSI", "BRI", "MANDIRI", "PERMATA"],
+            'payment_4' => ["OVO","DANA"],
+            'payment_3' => ["CREDIT_CARD"]
+        ];
+        $mtd = array(
+            'payment_1' => 'gopay',
+            'payment_2' => 'va_account',
+            'payment_3' => 'card',
+            'payment_4' => 'ewallet'
         );
         if(!$usingMidtransSnap && !$usingXenditSnap && !$cd){
             $this->result['message'] = 'Masukan kode bank!';
@@ -97,8 +108,8 @@ class Payment
     private function midtransPayment($payload, $userdata = null)
     {
         \Midtrans\Config::$serverKey = $this->key['midtrans']['server_key'];
-        \Midtrans\Config::$isProduction = false;
-        \Midtrans\Config::$appendNotifUrl = "https://example.com/test1";
+        \Midtrans\Config::$isProduction = getenv_docker('MIDTRANS_IS_PRODUCTION', 0) == 1 ? true : false;
+        \Midtrans\Config::$appendNotifUrl = getenv_docker('NOTIF_URL_MIDTRANS_WEB', 'https://deimos.halorumah.id/wp-json/hlrm/v1/payment/midtrans');
 
         $mobile = '';
         if($userdata != null){
@@ -181,6 +192,11 @@ class Payment
 
     private function xenditPayment($payload, $userdata = null)
     {
+        $payment_method = '';
+        if(isset($payload['extra']) && isset($payload['extra']['payment_method'])){
+            $payment_method = $payload['extra']['payment_method'];
+        }
+        // print_r($payment_method);exit;
         \Xendit\Xendit::setApiKey($this->key['xendit']['api_key']);
         $mobile = '';
         if($userdata != null){
@@ -207,11 +223,15 @@ class Payment
             'amount' => $payload['total_amount'],
             'description' => $payload['desc'],
             'payer_email' => $userdata->user_email,
-            'success_redirect_url' => 'https=>//www.google.com',
-            'failure_redirect_url' => 'https=>//www.google.com',
+            'success_redirect_url' => getenv_docker('REDIRECT_SUCCESS_PAYMENT', 'https://halorumah.id'),
+            'failure_redirect_url' => getenv_docker('REDIRECT_FAIL_PAYMENT', 'https://halorumah.id'),
             'currency' => 'IDR',
             'items' => $items
           ];
+          if($payment_method != '' && $payment_method === 'payment_2' || $payment_method === 'payment_3' || $payment_method == 'payment_4'){
+            $params['payment_methods'] = $this->xendit_method[$payment_method];
+          }
+        //   print_r($params);exit;
           try {
             $createInvoice = \Xendit\Invoice::create($params);
           

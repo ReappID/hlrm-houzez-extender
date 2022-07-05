@@ -1,3 +1,3 @@
 [submodule "php-discord-sdk"]
 	path = php-discord-sdk
-	url = https://github.com/cubiclesoft/php-discord-sdk.git
+	url = https://github.com/renaldimedia/php-discord-sdk.git
