@@ -1,6 +1,8 @@
 <?php
 
 require_once 'payment.class.php';
+require_once 'fn.php';
+
 
 class Houzez_Payment_Rest extends WP_REST_Controller
 {
@@ -214,7 +216,7 @@ class Houzez_Payment_Rest extends WP_REST_Controller
 
     if (!is_user_logged_in() && $request['user_email'] == null) {
       return new WP_Error('cant-create', __('message', 'text-domain'), array('status' => 401));
-    }
+    } 
     $py = new Payment(false, false, true, false);
 
     $total = get_post_meta(intval($request['selected_package']), 'fave_package_price', true);
@@ -241,7 +243,22 @@ class Houzez_Payment_Rest extends WP_REST_Controller
         'invoice_id' => $notif->order_id
       ));
 
+    
+
       if ($res) {
+        if(DISCORD_ENABLED == 1){
+            $x = send_bg(getenv_docker('NOTIF_URL_XENDIT_DISCORD', 'http://localhost:3001/payment/xendit'), array(
+                'user_email' => $notif->payer_email,
+                'invoice_id' => $notif->order_id,
+                'item_id' => isset($package['ID']) ? $package['ID'] : '',
+                'item' => $notif->items,
+                'source' => $notif->payment_method.'-'.$notif->payment_channel,
+                'pay_at' => date('d/m/Y') 
+            ), 'POST', array(
+                'Content-Type' => 'application/json',
+                'apiKey'=> getenv_docker('NOTIF_DISCORD_KEY', '')
+            ));
+        }
         return new WP_REST_Response(array('message' => 'success', 'data' => $res), 200);
         exit;
       }
